@@ -1,0 +1,106 @@
+`timescale 1ns/1ps
+
+module elevator_tb;
+
+    // -----------------------------
+    // Testbench Signals
+    // -----------------------------
+    reg clk;
+    reg reset;
+    reg [3:0] floor_req;
+    reg emergency_stop;
+
+    wire move_up;
+    wire move_down;
+    wire motor_stop;
+    wire [1:0] current_floor;
+
+    // -----------------------------
+    // DUT Instantiation
+    // -----------------------------
+   elevator dut (
+        .clk(clk),
+        .reset(reset),
+        .floor_req(floor_req),
+        .emergency_stop(emergency_stop),
+        .move_up(move_up),
+        .move_down(move_down),
+        .motor_stop(motor_stop),
+        .current_floor(current_floor)
+    );
+
+    // -----------------------------
+    // Clock Generation (10ns period)
+    // -----------------------------
+    initial clk = 0;
+    always #5 clk = ~clk;
+
+   
+
+initial begin
+    
+    // Initialize
+    reset = 1;
+    floor_req = 4'b0000;
+    emergency_stop = 0;
+
+    // Apply reset
+    #20;
+    reset = 0;
+
+    // =====================================================
+    // STAGE 1: Move from Floor 0 → Floor 3 (Step by Step)
+    // =====================================================
+    #10;
+    floor_req = 4'b1000;   // Request Floor 3
+    #120;                  // Enough time to observe 0→1→2→3
+    floor_req = 4'b0000;
+
+    // =====================================================
+    // STAGE 2: Move from Floor 3 → Floor 0
+    // =====================================================
+    #20;
+    floor_req = 4'b0001;   // Request Floor 0
+    #120;                  // Observe 3→2→1→0
+    floor_req = 4'b0000;
+
+    // =====================================================
+    // STAGE 3: Move to Floor 2
+    // =====================================================
+    #20;
+    floor_req = 4'b0100;   // Request Floor 2
+    #80;                   
+    floor_req = 4'b0000;
+
+    // =====================================================
+    // STAGE 4: Emergency During Movement
+    // =====================================================
+    #20;
+    floor_req = 4'b1000;   // Move toward Floor 3
+    #30;                   // Start moving
+    emergency_stop = 1;    // Emergency triggered
+    #40;
+    emergency_stop = 0;    // Clear emergency
+    floor_req = 4'b0000;
+
+    // =====================================================
+    // STAGE 5: Multiple Requests (Priority Test)
+    // =====================================================
+    #20;
+    floor_req = 4'b1010;   // Request Floor 1 and 3
+    #120;                  // Should go to 1 first (priority)
+    floor_req = 4'b0000;
+
+    // =====================================================
+    // End Simulation
+    // =====================================================
+    #100;
+    $finish;
+end
+
+    initial begin
+        $monitor("Time=%0t | Floor=%0d | Req=%b | UP=%b DOWN=%b STOP=%b EMG=%b",
+                 $time, current_floor, floor_req,
+                 move_up, move_down, motor_stop, emergency_stop);
+    end
+endmodule
